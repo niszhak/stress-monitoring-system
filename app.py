@@ -1,5 +1,5 @@
 # =========================================================
-# NIKA MINDTECH - FINAL COMPLETE SYSTEM (WITH SENSOR SUPPORT)
+# NIKA MINDTECH - FINAL SYSTEM (DEPLOYMENT SAFE)
 # =========================================================
 
 import streamlit as st
@@ -7,12 +7,11 @@ import pandas as pd
 import plotly.express as px
 import joblib
 import random
-import serial  # for hardware integration (optional)
 
 from database import *
 
 # ---------------------------------------------------------
-# SETTINGS
+# PAGE CONFIG
 # ---------------------------------------------------------
 st.set_page_config(page_title="NIKA MindTech", layout="wide")
 
@@ -41,48 +40,35 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# INIT
+# DATABASE + MODEL
 # ---------------------------------------------------------
 create_tables()
 create_default_employee()
 model = joblib.load("stress_model.pkl")
 
 # ---------------------------------------------------------
-# SENSOR FUNCTION (PLACEHOLDER / READY FOR HARDWARE)
+# SENSOR DATA FUNCTION (HARDWARE READY STRUCTURE)
 # ---------------------------------------------------------
 def get_sensor_data():
     """
-    Replace this with real Arduino/serial data later.
-    For now returns simulated values.
+    HARDWARE INTEGRATION POINT
+
+    For now → simulated values (so app works on Streamlit Cloud)
+
+    Later → replace this with:
+    - API call
+    - Database fetch
+    - Local bridge script (Arduino → Python → DB)
     """
 
-    try:
-        # Example serial reading (UNCOMMENT when hardware ready)
-        # ser = serial.Serial('COM3', 9600, timeout=1)
-        # line = ser.readline().decode().strip()
-        # values = line.split(',')
-        # return {
-        #     "heart_rate": float(values[0]),
-        #     "hrv": float(values[1]),
-        #     "temp": float(values[2])
-        # }
-
-        # Temporary simulated data
-        return {
-            "heart_rate": random.randint(65, 95),
-            "hrv": random.randint(40, 80),
-            "temp": round(random.uniform(36.0, 37.5), 2)
-        }
-
-    except:
-        return {
-            "heart_rate": 70,
-            "hrv": 60,
-            "temp": 36.5
-        }
+    return {
+        "heart_rate": random.randint(65, 95),
+        "hrv": random.randint(40, 80),
+        "temp": round(random.uniform(36.0, 37.5), 2)
+    }
 
 # ---------------------------------------------------------
-# SESSION
+# SESSION STATE
 # ---------------------------------------------------------
 if "login" not in st.session_state:
     st.session_state.login = False
@@ -91,47 +77,35 @@ if "menu" not in st.session_state:
     st.session_state.menu = "Dashboard"
 
 # =========================================================
-# LOGIN
+# LOGIN PAGE
 # =========================================================
 if not st.session_state.login:
 
     st.title("NIKA MINDTECH")
 
-    role = st.selectbox("Login As", ["Employee","Manager"])
-    user_label = "Employee ID" if role=="Employee" else "Manager ID"
-
-    user_id = st.text_input(user_label)
+    role = st.selectbox("Login As", ["Employee", "Manager"])
+    user_id = st.text_input("ID")
     password = st.text_input("Password", type="password")
 
     if st.button("Login"):
 
         if role == "Employee":
             if validate_employee(user_id, password):
-                st.session_state.login=True
-                st.session_state.role=role
-                st.session_state.user=user_id
+                st.session_state.login = True
+                st.session_state.role = role
+                st.session_state.user = user_id
                 st.rerun()
             else:
                 st.error("Invalid Employee Login")
 
         else:
-            if user_id=="admin" and password=="admin":
-                st.session_state.login=True
-                st.session_state.role=role
-                st.session_state.user=user_id
+            if user_id == "admin" and password == "admin":
+                st.session_state.login = True
+                st.session_state.role = role
+                st.session_state.user = user_id
                 st.rerun()
             else:
                 st.error("Invalid Manager Login")
-
-    # Fingerprint login (placeholder)
-    if st.button("🔒 Fingerprint Login"):
-        emp = fingerprint_login()
-        if emp:
-            st.session_state.login=True
-            st.session_state.role="Employee"
-            st.session_state.user=emp
-            st.success(f"Logged in as {emp}")
-            st.rerun()
 
 # =========================================================
 # MAIN APP
@@ -143,11 +117,11 @@ else:
 
     st.sidebar.title("🧠 NIKA")
 
-    def nav(x):
-        if st.sidebar.button(x):
-            st.session_state.menu=x
+    def nav(page):
+        if st.sidebar.button(page):
+            st.session_state.menu = page
 
-    if role=="Employee":
+    if role == "Employee":
         nav("Dashboard")
         nav("Stress Monitoring")
         nav("Wellness")
@@ -160,46 +134,46 @@ else:
 # =========================================================
 # REGISTER EMPLOYEE
 # =========================================================
-    if menu=="Register Employee":
+    if menu == "Register Employee":
 
         st.title("Register Employee")
 
         name = st.text_input("Name")
         dept = st.text_input("Department")
 
-        fingerprint=None
+        fingerprint = None
         if st.button("Scan Fingerprint"):
-            fingerprint=f"FP{random.randint(100,999)}"
+            fingerprint = f"FP{random.randint(100,999)}"
             st.success(f"Captured: {fingerprint}")
 
         if st.button("Register"):
-            emp_id=generate_employee_id()
-            pwd=generate_password()
-            insert_employee(emp_id,name,dept,pwd,fingerprint)
+            emp_id = generate_employee_id()
+            pwd = generate_password()
+            insert_employee(emp_id, name, dept, pwd, fingerprint)
             st.success(f"ID: {emp_id} | Password: {pwd}")
 
 # =========================================================
 # DASHBOARD
 # =========================================================
-    if menu=="Dashboard":
+    if menu == "Dashboard":
 
         st.title("Dashboard")
 
-        df=fetch_employee_data(user)
-        st.metric("Records",len(df))
+        df = fetch_employee_data(user)
+        st.metric("Records", len(df))
 
         if not df.empty:
-            df["timestamp"]=pd.to_datetime(df["timestamp"])
-            st.plotly_chart(px.line(df,x="timestamp",y="stress"))
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            st.plotly_chart(px.line(df, x="timestamp", y="stress"))
 
 # =========================================================
 # STRESS MONITORING (WITH SENSOR DATA)
 # =========================================================
-    if menu=="Stress Monitoring":
+    if menu == "Stress Monitoring":
 
-        st.title("Stress Monitoring (Live Sensor Data)")
+        st.title("Stress Monitoring (Sensor Ready)")
 
-        # ✅ GET DATA FROM SENSOR
+        # ✅ GET SENSOR DATA
         data = get_sensor_data()
 
         heart_rate = data["heart_rate"]
@@ -210,72 +184,80 @@ else:
         st.write("HRV:", hrv)
         st.write("Temperature:", temp)
 
-        workload = st.slider("Workload",1,10)
-        sleep = st.slider("Sleep Hours",3.0,8.0)
+        workload = st.slider("Workload", 1, 10)
+        sleep = st.slider("Sleep Hours", 3.0, 8.0)
 
-        if st.button("Predict"):
+        if st.button("Predict Stress"):
 
-            df=pd.DataFrame([{
-                "heart_rate":heart_rate,
-                "hrv":hrv,
-                "temp":temp,
-                "workload":workload,
-                "sleep":sleep
+            df = pd.DataFrame([{
+                "heart_rate": heart_rate,
+                "hrv": hrv,
+                "temp": temp,
+                "workload": workload,
+                "sleep": sleep
             }])
 
-            stress=int(model.predict(df)[0])
-            insert_record(user,heart_rate,hrv,temp,workload,sleep,stress)
+            stress = int(model.predict(df)[0])
+
+            insert_record(user, heart_rate, hrv, temp, workload, sleep, stress)
 
             st.success(f"Stress Level: {stress}")
 
 # =========================================================
-# WELLNESS
+# WELLNESS MODULE (Q&A)
 # =========================================================
-    if menu=="Wellness":
+    if menu == "Wellness":
 
         st.title("🧘 Wellness Q&A")
 
         questions = {
             "How to reduce stress quickly?":
-                "Take deep breaths, pause work, drink water, and relax your body.",
+                "Take deep breaths, relax, drink water, and take short breaks.",
 
-            "What are signs of high stress?":
-                "Headache, fatigue, irritation, poor sleep, and lack of focus.",
+            "What are signs of stress?":
+                "Headache, fatigue, irritability, poor sleep, lack of focus.",
 
-            "How much sleep is recommended?":
-                "7–8 hours of quality sleep is ideal for adults.",
+            "How much sleep is needed?":
+                "7–8 hours of quality sleep is recommended.",
 
-            "Best way to relax during work?":
-                "Take a 5–10 minute break, stretch, or go for a short walk.",
+            "Best way to relax?":
+                "Walk, meditate, stretch, or listen to calming music.",
 
-            "How to improve mental health daily?":
-                "Exercise, eat healthy, stay connected, and practice mindfulness.",
+            "How to improve mental health?":
+                "Exercise, good sleep, healthy diet, social interaction.",
 
-            "What to do when feeling overwhelmed?":
-                "Break tasks into small steps and focus on one at a time.",
+            "What to do when overwhelmed?":
+                "Break tasks into small steps and prioritize.",
 
-            "Does exercise reduce stress?":
-                "Yes, it releases endorphins which improve mood and reduce stress."
+            "Does exercise help stress?":
+                "Yes, it releases endorphins that improve mood."
         }
 
-        selected_q = st.selectbox("Choose your question:", list(questions.keys()))
+        q = st.selectbox("Choose a question:", list(questions.keys()))
 
-        if selected_q:
-            st.markdown(f"<div class='qa-box'><b>Answer:</b><br>{questions[selected_q]}</div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="qa-box">
+        <b>Answer:</b><br>{questions[q]}
+        </div>
+        """, unsafe_allow_html=True)
 
 # =========================================================
 # MANAGER DASHBOARD
 # =========================================================
-    if menu=="Manager Dashboard":
+    if menu == "Manager Dashboard":
 
         st.title("Manager Dashboard")
 
-        df=fetch_all_data()
-        st.plotly_chart(px.pie(df,names="stress"))
+        df = fetch_all_data()
+
+        if not df.empty:
+            st.plotly_chart(px.pie(df, names="stress"))
+        else:
+            st.info("No data available")
 
 # =========================================================
 # LOGOUT
 # =========================================================
     if st.sidebar.button("Logout"):
-        st.session_state.login=False
+        st.session_state.login = False
         st.rerun()
