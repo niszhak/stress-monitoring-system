@@ -1,5 +1,5 @@
 # =========================================================
-# NIKA MINDTECH - FINAL COMPLETE SYSTEM (NO CHATBOT + Q&A WELLNESS)
+# NIKA MINDTECH - FINAL COMPLETE SYSTEM (WITH SENSOR SUPPORT)
 # =========================================================
 
 import streamlit as st
@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import joblib
 import random
+import serial  # for hardware integration (optional)
 
 from database import *
 
@@ -16,7 +17,7 @@ from database import *
 st.set_page_config(page_title="NIKA MindTech", layout="wide")
 
 # ---------------------------------------------------------
-# UI
+# UI STYLE
 # ---------------------------------------------------------
 st.markdown("""
 <style>
@@ -45,6 +46,40 @@ st.markdown("""
 create_tables()
 create_default_employee()
 model = joblib.load("stress_model.pkl")
+
+# ---------------------------------------------------------
+# SENSOR FUNCTION (PLACEHOLDER / READY FOR HARDWARE)
+# ---------------------------------------------------------
+def get_sensor_data():
+    """
+    Replace this with real Arduino/serial data later.
+    For now returns simulated values.
+    """
+
+    try:
+        # Example serial reading (UNCOMMENT when hardware ready)
+        # ser = serial.Serial('COM3', 9600, timeout=1)
+        # line = ser.readline().decode().strip()
+        # values = line.split(',')
+        # return {
+        #     "heart_rate": float(values[0]),
+        #     "hrv": float(values[1]),
+        #     "temp": float(values[2])
+        # }
+
+        # Temporary simulated data
+        return {
+            "heart_rate": random.randint(65, 95),
+            "hrv": random.randint(40, 80),
+            "temp": round(random.uniform(36.0, 37.5), 2)
+        }
+
+    except:
+        return {
+            "heart_rate": 70,
+            "hrv": 60,
+            "temp": 36.5
+        }
 
 # ---------------------------------------------------------
 # SESSION
@@ -88,7 +123,7 @@ if not st.session_state.login:
             else:
                 st.error("Invalid Manager Login")
 
-    # Fingerprint login
+    # Fingerprint login (placeholder)
     if st.button("🔒 Fingerprint Login"):
         emp = fingerprint_login()
         if emp:
@@ -115,7 +150,7 @@ else:
     if role=="Employee":
         nav("Dashboard")
         nav("Stress Monitoring")
-        nav("Wellness")   # ONLY Q&A MODULE
+        nav("Wellness")
     else:
         nav("Manager Dashboard")
         nav("Register Employee")
@@ -158,17 +193,25 @@ else:
             st.plotly_chart(px.line(df,x="timestamp",y="stress"))
 
 # =========================================================
-# STRESS MONITORING
+# STRESS MONITORING (WITH SENSOR DATA)
 # =========================================================
     if menu=="Stress Monitoring":
 
-        st.title("Stress Monitoring")
+        st.title("Stress Monitoring (Live Sensor Data)")
 
-        heart_rate=st.slider("Heart Rate",60,120)
-        hrv=st.slider("HRV",20,100)
-        temp=st.slider("Temperature",32.0,36.0)
-        workload=st.slider("Workload",1,10)
-        sleep=st.slider("Sleep Hours",3.0,8.0)
+        # ✅ GET DATA FROM SENSOR
+        data = get_sensor_data()
+
+        heart_rate = data["heart_rate"]
+        hrv = data["hrv"]
+        temp = data["temp"]
+
+        st.write("Heart Rate:", heart_rate)
+        st.write("HRV:", hrv)
+        st.write("Temperature:", temp)
+
+        workload = st.slider("Workload",1,10)
+        sleep = st.slider("Sleep Hours",3.0,8.0)
 
         if st.button("Predict"):
 
@@ -186,7 +229,7 @@ else:
             st.success(f"Stress Level: {stress}")
 
 # =========================================================
-# WELLNESS (Q&A MODULE ✅)
+# WELLNESS
 # =========================================================
     if menu=="Wellness":
 
