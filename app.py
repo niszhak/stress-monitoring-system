@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import joblib
 import random
+import os
 
 from database import *
 
@@ -16,14 +17,27 @@ create_default_employee()
 model = joblib.load("stress_model.pkl")
 
 # ---------------------------------------------------------
-# SENSOR SIMULATION (HARDWARE READY)
+# MODE DETECTION (IMPORTANT)
 # ---------------------------------------------------------
-def get_sensor_data():
-    return {
-        "heart_rate": random.randint(65, 95),
-        "hrv": random.randint(40, 80),
-        "temp": round(random.uniform(36.0, 37.5), 2)
-    }
+HARDWARE_MODE = os.path.exists("live.txt")
+
+# ---------------------------------------------------------
+# HARDWARE FUNCTIONS
+# ---------------------------------------------------------
+def get_fingerprint():
+    try:
+        with open("fingerprint.txt", "r") as f:
+            return int(f.read())
+    except:
+        return None
+
+def get_live_data():
+    try:
+        with open("live.txt", "r") as f:
+            data = f.read().split(",")
+            return int(data[1]), int(data[2]), float(data[3])
+    except:
+        return None, None, None
 
 # ---------------------------------------------------------
 # SESSION
@@ -66,17 +80,27 @@ if not st.session_state.login:
             else:
                 st.error("Invalid Manager Login")
 
-    # Fingerprint login (simulated)
+    # 🔒 FINGERPRINT LOGIN (AUTO SWITCH)
     if st.button("🔒 Fingerprint Login"):
-        fp = random.choice(["FP001", "FP_ADMIN"])
-        emp = fingerprint_login(fp)
 
-        if emp:
-            st.session_state.login = True
-            st.session_state.role = "Employee"
-            st.session_state.user = emp
-            st.success(f"Logged in via fingerprint: {emp}")
-            st.rerun()
+        if HARDWARE_MODE:
+            fid = get_fingerprint()
+        else:
+            fid = "FP001"   # Demo mode
+
+        if fid:
+            emp = get_employee_by_fingerprint(fid)
+
+            if emp:
+                st.session_state.login = True
+                st.session_state.role = "Employee"
+                st.session_state.user = emp[0]
+                st.success(f"Logged in via fingerprint: {emp[1]}")
+                st.rerun()
+            else:
+                st.error("Fingerprint not registered")
+        else:
+            st.error("No fingerprint detected")
 
 # =========================================================
 # MAIN APP
@@ -112,23 +136,36 @@ else:
         name = st.text_input("Name")
         dept = st.text_input("Department")
 
-        fingerprint_id = None
+        fid = None
 
+        # 🔍 SCAN FINGERPRINT
         if st.button("Scan Fingerprint"):
-            fingerprint_id = f"FP{random.randint(100,999)}"
-            st.success(f"Fingerprint Captured: {fingerprint_id}")
+            if HARDWARE_MODE:
+                fid = get_fingerprint()
+            else:
+                fid = "FP" + str(random.randint(100,999))
 
+            if fid:
+                st.success(f"Fingerprint Captured! ID: {fid}")
+            else:
+                st.error("Scan failed")
+
+        # ✅ REGISTER
         if st.button("Register"):
-            emp_id = generate_employee_id()
-            pwd = generate_password()
-            insert_employee(emp_id, name, dept, pwd, fingerprint_id)
+            if fid:
+                emp_id = generate_employee_id()
+                pwd = generate_password()
 
-            st.success(f"""
-            Employee Registered  
-            ID: {emp_id}  
-            Password: {pwd}  
-            Fingerprint: {fingerprint_id}
-            """)
+                insert_employee(emp_id, name, dept, pwd, str(fid))
+
+                st.success(f"""
+                Employee Registered  
+                ID: {emp_id}  
+                Password: {pwd}  
+                Fingerprint ID: {fid}
+                """)
+            else:
+                st.error("Scan fingerprint first!")
 
 # =========================================================
 # DASHBOARD
@@ -156,34 +193,45 @@ else:
 
         st.title("Stress Monitoring")
 
-        data = get_sensor_data()
+        # 🔁 AUTO MODE SWITCH
+        if HARDWARE_MODE:
+            fid, hr, temp = get_live_data()
+        else:
+            fid = "FP001"
+            hr = random.randint(65, 95)
+            temp = round(random.uniform(36.0, 37.5), 2)
 
-        hr = data["heart_rate"]
-        hrv = data["hrv"]
-        temp = data["temp"]
+        if hr:
+            st.write("Heart Rate:", hr)
+            st.write("Temperature:", temp)
 
-        st.write("Heart Rate:", hr)
-        st.write("HRV:", hrv)
-        st.write("Temperature:", temp)
+            emp = get_employee_by_fingerprint(fid)
+            if emp:
+                st.write("Employee:", emp[1])
+        else:
+            st.warning("Waiting for sensor data...")
 
         workload = st.slider("Workload",1,10)
         sleep = st.slider("Sleep",3.0,8.0)
 
         if st.button("Predict Stress"):
 
-            df = pd.DataFrame([{
-                "heart_rate": hr,
-                "hrv": hrv,
-                "temp": temp,
-                "workload": workload,
-                "sleep": sleep
-            }])
+            if hr:
+                df = pd.DataFrame([{
+                    "heart_rate": hr,
+                    "hrv": 50,
+                    "temp": temp,
+                    "workload": workload,
+                    "sleep": sleep
+                }])
 
-            stress = int(model.predict(df)[0])
+                stress = int(model.predict(df)[0])
 
-            insert_record(user, hr, hrv, temp, workload, sleep, stress)
+                insert_record(user, hr, 50, temp, workload, sleep, stress)
 
-            st.success(f"Stress Level: {stress}")
+                st.success(f"Stress Level: {stress}")
+            else:
+                st.error("No sensor data")
 
 # =========================================================
 # WELLNESS
