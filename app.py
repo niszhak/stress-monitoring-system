@@ -17,7 +17,7 @@ create_default_employee()
 model = joblib.load("stress_model.pkl")
 
 # ---------------------------------------------------------
-# MODE DETECTION (IMPORTANT)
+# MODE DETECTION
 # ---------------------------------------------------------
 HARDWARE_MODE = os.path.exists("live.txt")
 
@@ -47,6 +47,10 @@ if "login" not in st.session_state:
 
 if "menu" not in st.session_state:
     st.session_state.menu = "Dashboard"
+
+# ✅ IMPORTANT FIX
+if "fid" not in st.session_state:
+    st.session_state.fid = None
 
 # =========================================================
 # LOGIN PAGE
@@ -80,13 +84,13 @@ if not st.session_state.login:
             else:
                 st.error("Invalid Manager Login")
 
-    # 🔒 FINGERPRINT LOGIN (AUTO SWITCH)
+    # Fingerprint Login
     if st.button("🔒 Fingerprint Login"):
 
         if HARDWARE_MODE:
             fid = get_fingerprint()
         else:
-            fid = "FP001"   # Demo mode
+            fid = "FP001"
 
         if fid:
             emp = get_employee_by_fingerprint(fid)
@@ -127,7 +131,7 @@ else:
     menu = st.session_state.menu
 
 # =========================================================
-# REGISTER EMPLOYEE
+# REGISTER EMPLOYEE (FIXED)
 # =========================================================
     if menu == "Register Employee":
 
@@ -136,34 +140,35 @@ else:
         name = st.text_input("Name")
         dept = st.text_input("Department")
 
-        fid = None
-
-        # 🔍 SCAN FINGERPRINT
+        # 🔍 SCAN
         if st.button("Scan Fingerprint"):
             if HARDWARE_MODE:
-                fid = get_fingerprint()
+                st.session_state.fid = get_fingerprint()
             else:
-                fid = "FP" + str(random.randint(100,999))
+                st.session_state.fid = "FP" + str(random.randint(100,999))
 
-            if fid:
-                st.success(f"Fingerprint Captured! ID: {fid}")
+            if st.session_state.fid:
+                st.success(f"Fingerprint Captured! ID: {st.session_state.fid}")
             else:
                 st.error("Scan failed")
 
         # ✅ REGISTER
         if st.button("Register"):
-            if fid:
+            if st.session_state.fid:
                 emp_id = generate_employee_id()
                 pwd = generate_password()
 
-                insert_employee(emp_id, name, dept, pwd, str(fid))
+                insert_employee(emp_id, name, dept, pwd, str(st.session_state.fid))
 
                 st.success(f"""
                 Employee Registered  
                 ID: {emp_id}  
                 Password: {pwd}  
-                Fingerprint ID: {fid}
+                Fingerprint ID: {st.session_state.fid}
                 """)
+
+                # reset after register
+                st.session_state.fid = None
             else:
                 st.error("Scan fingerprint first!")
 
@@ -193,7 +198,6 @@ else:
 
         st.title("Stress Monitoring")
 
-        # 🔁 AUTO MODE SWITCH
         if HARDWARE_MODE:
             fid, hr, temp = get_live_data()
         else:
